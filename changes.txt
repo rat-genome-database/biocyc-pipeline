@@ -1,2 +1,2 @@
 Apr 18, 2022
-  project setup
+  load of entire RatCyc file in database table BIOCYC

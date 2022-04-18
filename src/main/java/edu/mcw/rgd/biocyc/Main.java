@@ -8,6 +8,7 @@ import org.springframework.beans.factory.support.DefaultListableBeanFactory;
 import org.springframework.beans.factory.xml.XmlBeanDefinitionReader;
 import org.springframework.core.io.FileSystemResource;
 
+import java.io.BufferedReader;
 import java.text.SimpleDateFormat;
 import java.util.*;
 
@@ -59,6 +60,46 @@ public class Main {
         String localFile = fd.downloadNew();
 
         log.info("downloaded file "+localFile);
+
+        int deleted = dao.deleteAllRows();
+        log.info("deleted rows "+deleted);
+
+        int linesRead = 0;
+
+        BufferedReader in = Utils.openReader(localFile);
+        String line;
+        while( (line=in.readLine())!=null ) {
+            String[] cols = line.split("[\\t]", -1);
+
+            // 1. The gene's RatCyc ID
+            // 2. The gene's RGD ID (number, no prefix)
+            // 3. The gene's NCBI ID (number, no prefix)
+            // 4. The Uniprot ID of a product of the gene
+            // 5. The RatCyc ID of a pathway associated with the gene
+            // 6. Name of pathway associated with the gene
+            // 7. A URL that points to the RatCyc pathway Page for the pathway in column 5
+            // 8. A URL that points to the RatCyc gene page for the gene in column 1
+
+            BioCycRecord r = new BioCycRecord();
+            r.setGeneRatCycId(cols[0]);
+            r.setGeneNcbiId(cols[2]);
+            r.setUniProtId(cols[3]);
+            r.setPathwayRatCycId(cols[4]);
+            r.setPathwayRatCycName(cols[5]);
+            r.setPathwayRatCycPage(cols[6]);
+            r.setGeneRatCycPage(cols[7]);
+
+            if( !Utils.isStringEmpty(cols[1]) ) {
+                r.setGeneRgdId(Integer.parseInt(cols[1]));
+            }
+
+            dao.insertRecord(r);
+
+            linesRead++;
+        }
+        in.close();
+
+        log.info("lines read from file: "+linesRead);
 
         log.info("");
         log.info("===    time elapsed: "+ Utils.formatElapsedTime(startTime, System.currentTimeMillis()));
