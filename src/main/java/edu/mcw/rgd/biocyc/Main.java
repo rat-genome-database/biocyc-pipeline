@@ -61,10 +61,7 @@ public class Main {
 
         log.info("downloaded file "+localFile);
 
-        int deleted = dao.deleteAllRows();
-        log.info("deleted rows "+deleted);
-
-        int linesRead = 0;
+        List<BioCycRecord> incomingRecords = new ArrayList<>();
 
         BufferedReader in = Utils.openReader(localFile);
         String line;
@@ -93,19 +90,71 @@ public class Main {
                 r.setGeneRgdId(Integer.parseInt(cols[1]));
             }
 
-            dao.insertRecord(r);
-
-            linesRead++;
+            incomingRecords.add(r);
         }
         in.close();
 
-        log.info("lines read from file: "+linesRead);
+        log.info("lines read from file: "+incomingRecords.size());
+
+        Collection<BioCycRecord> uniqueIncomingRecords = merge(incomingRecords);
+        log.info("unique records after merge: "+uniqueIncomingRecords.size());
+
+
+        int deleted = dao.deleteAllRows();
+        log.info("deleted rows "+deleted);
+
+        for( BioCycRecord r: uniqueIncomingRecords ) {
+            dao.insertRecord(r);
+        }
 
         log.info("");
         log.info("===    time elapsed: "+ Utils.formatElapsedTime(startTime, System.currentTimeMillis()));
         log.info("");
     }
 
+    Collection<BioCycRecord> merge(List<BioCycRecord> incoming) throws Exception {
+
+        // unique record must have unique (gene_id, pathway_id)
+        Map<String, BioCycRecord> uniqueMap = new HashMap<>();
+
+        for( BioCycRecord r: incoming ) {
+            String key = r.getGeneRatCycId()+"|"+r.getPathwayRatCycId();
+            BioCycRecord u = uniqueMap.get(key);
+            if( u==null ) {
+                uniqueMap.put(key, r);
+            } else {
+                // merge: gene rgd id
+                if( r.getGeneRgdId()!=null ) {
+                    if( u.getGeneRgdId()==null ) {
+                        u.setGeneRgdId(r.getGeneRgdId());
+                        u.setGeneNcbiId(r.getGeneNcbiId());
+                        u.setGeneRatCycPage(r.getGeneRatCycPage());
+                    } else {
+                        int geneRgdId1 = u.getGeneRgdId();
+                        int geneRgdId2 = r.getGeneRgdId();
+                        if( geneRgdId1!=geneRgdId2 ) {
+                            throw new Exception("unexpected");
+                        }
+                    }
+                }
+
+                // merge uniprot ids
+                if( r.getUniProtId()!=null ) {
+                    if( u.getUniProtId()==null ) {
+                        u.setUniProtId(r.getUniProtId());
+                    }
+                    else if( !u.getUniProtId().contains(r.getUniProtId()) ) {
+                        String[] ids = u.getUniProtId().split(",");
+                        TreeSet<String> iset = new TreeSet<>(Arrays.asList(ids));
+                        iset.add(r.getUniProtId());
+                        u.setUniProtId( Utils.concatenate(iset, ","));
+                    }
+                }
+            }
+        }
+
+        return uniqueMap.values();
+    }
 
     public void setVersion(String version) {
         this.version = version;

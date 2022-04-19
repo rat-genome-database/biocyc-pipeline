@@ -33,6 +33,6 @@ public class Dao {
                 +"pathway_ratcyc_id,pathway_ratcyc_name,pathway_ratcyc_page) VALUES(?,?,?,?,?,?,?,?)";
 
         dao.update(sql, r.getGeneRatCycId(), r.getGeneRgdId(), r.getGeneNcbiId(), r.getUniProtId(), r.getGeneRatCycPage(),
-                r.getPathwayRatCycId(), r.getPathwayRatCycName(), r.getGeneRatCycPage());
+                r.getPathwayRatCycId(), r.getPathwayRatCycName(), r.getPathwayRatCycPage());
     }
 }
