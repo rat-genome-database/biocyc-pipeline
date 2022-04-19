@@ -3,5 +3,7 @@
     <bean id="main" class="edu.mcw.rgd.biocyc.Main">
         <property name="version" value="BioCyc pipeline   -- build Apr 19, 2022" />
         <property name="rgdSynchFile" value="https://biocyc.org/rgd-synch"/>
+        <property name="bioCycGeneXdbKey" value="139"/>
+        <property name="bioCycPathwayXdbKey" value="140"/>
     </bean>
 </beans>

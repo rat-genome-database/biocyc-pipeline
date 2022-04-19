@@ -1,5 +1,8 @@
 package edu.mcw.rgd.biocyc;
 
+import edu.mcw.rgd.datamodel.SpeciesType;
+import edu.mcw.rgd.datamodel.Xdb;
+import edu.mcw.rgd.datamodel.XdbId;
 import edu.mcw.rgd.process.FileDownloader;
 import edu.mcw.rgd.process.Utils;
 import org.apache.logging.log4j.LogManager;
@@ -21,6 +24,8 @@ public class Main {
     private Dao dao = new Dao();
     private String version;
     private String rgdSynchFile;
+    private int bioCycGeneXdbKey;
+    private int bioCycPathwayXdbKey;
 
     Logger log = LogManager.getLogger("status");
 
@@ -107,6 +112,8 @@ public class Main {
             dao.insertRecord(r);
         }
 
+        generateGeneXdbIds(uniqueIncomingRecords);
+
         log.info("");
         log.info("===    time elapsed: "+ Utils.formatElapsedTime(startTime, System.currentTimeMillis()));
         log.info("");
@@ -156,6 +163,53 @@ public class Main {
         return uniqueMap.values();
     }
 
+    void generateGeneXdbIds(Collection<BioCycRecord> incoming) throws Exception {
+
+        List<XdbId> incomigGeneXdbIds = new ArrayList<>();
+
+        incoming.parallelStream().forEach( r -> {
+
+            int geneRgdId = 0;
+            if( r.getGeneRgdId()!=null ) {
+                geneRgdId = r.getGeneRgdId();
+            }
+            else {
+                geneRgdId = dao.getGeneRgdIdByNcbiId(r.getGeneNcbiId(), SpeciesType.RAT);
+            }
+            if( geneRgdId==0 ) {
+                //log.warn("no matching gene for RGD:"+r.getGeneRgdId()+", NCBI_ID:"+r.getGeneNcbiId());
+            } else {
+
+                XdbId xdbId = new XdbId();
+                xdbId.setXdbKey(getBioCycGeneXdbKey());
+                xdbId.setAccId(r.getGeneRatCycId());
+                xdbId.setRgdId(geneRgdId);
+                xdbId.setSrcPipeline("BioCyc");
+                addToList(xdbId, incomigGeneXdbIds);
+            }
+        });
+        log.info("xdb ids incoming: "+incomigGeneXdbIds.size());
+
+
+        List<XdbId> inRgdXdbIds = dao.getGeneBioCycXdbIds(getBioCycGeneXdbKey());
+
+        List<XdbId> xdbIdsForInsert = new ArrayList<>(incomigGeneXdbIds);
+        xdbIdsForInsert.removeAll(inRgdXdbIds);
+
+        List<XdbId> xdbIdsForDelete = new ArrayList<>(inRgdXdbIds);
+        xdbIdsForDelete.removeAll(incomigGeneXdbIds);
+
+        log.info("xdb ids for insert: "+xdbIdsForInsert.size());
+        log.info("xdb ids for delete: "+xdbIdsForDelete.size());
+
+        dao.insertXdbIds(xdbIdsForInsert);
+        dao.deleteXdbIds(xdbIdsForDelete);
+    }
+
+    synchronized void addToList(XdbId xdbId, List<XdbId> xdbIds) {
+        xdbIds.add(xdbId);
+    }
+
     public void setVersion(String version) {
         this.version = version;
     }
@@ -170,6 +224,22 @@ public class Main {
 
     public void setRgdSynchFile(String rgdSynchFile) {
         this.rgdSynchFile = rgdSynchFile;
+    }
+
+    public int getBioCycGeneXdbKey() {
+        return bioCycGeneXdbKey;
+    }
+
+    public void setBioCycGeneXdbKey(int bioCycGeneXdbKey) {
+        this.bioCycGeneXdbKey = bioCycGeneXdbKey;
+    }
+
+    public int getBioCycPathwayXdbKey() {
+        return bioCycPathwayXdbKey;
+    }
+
+    public void setBioCycPathwayXdbKey(int bioCycPathwayXdbKey) {
+        this.bioCycPathwayXdbKey = bioCycPathwayXdbKey;
     }
 }
 

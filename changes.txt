@@ -1,5 +1,6 @@
 Apr 19, 2022
   implemented merging of duplicate incoming data
-
+  implement loading of BioCyc gene xdb ids
+  
 Apr 18, 2022
   load of entire RatCyc file in database table BIOCYC
