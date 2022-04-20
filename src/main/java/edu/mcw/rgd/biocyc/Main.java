@@ -113,6 +113,7 @@ public class Main {
         }
 
         generateGeneXdbIds(uniqueIncomingRecords);
+        generatePathwayXdbIds(uniqueIncomingRecords);
 
         log.info("");
         log.info("===    time elapsed: "+ Utils.formatElapsedTime(startTime, System.currentTimeMillis()));
@@ -165,6 +166,8 @@ public class Main {
 
     void generateGeneXdbIds(Collection<BioCycRecord> incoming) throws Exception {
 
+        log.info("genes:");
+
         List<XdbId> incomigGeneXdbIds = new ArrayList<>();
 
         incoming.parallelStream().forEach( r -> {
@@ -188,7 +191,7 @@ public class Main {
                 addToList(xdbId, incomigGeneXdbIds);
             }
         });
-        log.info("xdb ids incoming: "+incomigGeneXdbIds.size());
+        log.info("   xdb ids incoming: "+incomigGeneXdbIds.size());
 
 
         List<XdbId> inRgdXdbIds = dao.getGeneBioCycXdbIds(getBioCycGeneXdbKey());
@@ -199,8 +202,58 @@ public class Main {
         List<XdbId> xdbIdsForDelete = new ArrayList<>(inRgdXdbIds);
         xdbIdsForDelete.removeAll(incomigGeneXdbIds);
 
-        log.info("xdb ids for insert: "+xdbIdsForInsert.size());
-        log.info("xdb ids for delete: "+xdbIdsForDelete.size());
+        log.info("   xdb ids for insert: "+xdbIdsForInsert.size());
+        log.info("   xdb ids for delete: "+xdbIdsForDelete.size());
+
+        dao.insertXdbIds(xdbIdsForInsert);
+        dao.deleteXdbIds(xdbIdsForDelete);
+    }
+
+    void generatePathwayXdbIds(Collection<BioCycRecord> incoming) throws Exception {
+
+        log.info("pathways:");
+
+        List<XdbId> incomigPathwayXdbIds = new ArrayList<>();
+
+        incoming.parallelStream().forEach( r -> {
+
+            if( Utils.isStringEmpty(r.getPathwayRatCycId()) ) {
+                return;
+            }
+
+            int geneRgdId = 0;
+            if( r.getGeneRgdId()!=null ) {
+                geneRgdId = r.getGeneRgdId();
+            }
+            else {
+                geneRgdId = dao.getGeneRgdIdByNcbiId(r.getGeneNcbiId(), SpeciesType.RAT);
+            }
+            if( geneRgdId==0 ) {
+                //log.warn("no matching gene for RGD:"+r.getGeneRgdId()+", NCBI_ID:"+r.getGeneNcbiId());
+            } else {
+
+                XdbId xdbId = new XdbId();
+                xdbId.setXdbKey(getBioCycPathwayXdbKey());
+                xdbId.setAccId(r.getPathwayRatCycId());
+                xdbId.setLinkText(r.getPathwayRatCycId()+" ["+r.getPathwayRatCycName()+"]");
+                xdbId.setRgdId(geneRgdId);
+                xdbId.setSrcPipeline("BioCyc");
+                addToList(xdbId, incomigPathwayXdbIds);
+            }
+        });
+        log.info("   xdb ids incoming: "+incomigPathwayXdbIds.size());
+
+
+        List<XdbId> inRgdXdbIds = dao.getGeneBioCycXdbIds(getBioCycPathwayXdbKey());
+
+        List<XdbId> xdbIdsForInsert = new ArrayList<>(incomigPathwayXdbIds);
+        xdbIdsForInsert.removeAll(inRgdXdbIds);
+
+        List<XdbId> xdbIdsForDelete = new ArrayList<>(inRgdXdbIds);
+        xdbIdsForDelete.removeAll(incomigPathwayXdbIds);
+
+        log.info("   xdb ids for insert: "+xdbIdsForInsert.size());
+        log.info("   xdb ids for delete: "+xdbIdsForDelete.size());
 
         dao.insertXdbIds(xdbIdsForInsert);
         dao.deleteXdbIds(xdbIdsForDelete);
