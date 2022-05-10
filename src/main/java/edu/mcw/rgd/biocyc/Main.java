@@ -1,10 +1,10 @@
 package edu.mcw.rgd.biocyc;
 
 import edu.mcw.rgd.datamodel.SpeciesType;
-import edu.mcw.rgd.datamodel.Xdb;
 import edu.mcw.rgd.datamodel.XdbId;
 import edu.mcw.rgd.process.FileDownloader;
 import edu.mcw.rgd.process.Utils;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.springframework.beans.factory.support.DefaultListableBeanFactory;
@@ -104,13 +104,7 @@ public class Main {
         Collection<BioCycRecord> uniqueIncomingRecords = merge(incomingRecords);
         log.info("unique records after merge: "+uniqueIncomingRecords.size());
 
-
-        int deleted = dao.deleteAllRows();
-        log.info("deleted rows "+deleted);
-
-        for( BioCycRecord r: uniqueIncomingRecords ) {
-            dao.insertRecord(r);
-        }
+        updateBioCycTable(uniqueIncomingRecords);
 
         generateGeneXdbIds(uniqueIncomingRecords);
         generatePathwayXdbIds(uniqueIncomingRecords);
@@ -118,6 +112,32 @@ public class Main {
         log.info("");
         log.info("===    time elapsed: "+ Utils.formatElapsedTime(startTime, System.currentTimeMillis()));
         log.info("");
+    }
+
+    void updateBioCycTable(Collection<BioCycRecord> incomingRecords) throws Exception {
+
+        List<BioCycRecord> inRgdRecords = dao.getAllRecords();
+        log.info("lines in RGD: "+inRgdRecords.size());
+
+        Collection<BioCycRecord> forInsert = CollectionUtils.subtract(incomingRecords, inRgdRecords);
+        Collection<BioCycRecord> forDelete = CollectionUtils.subtract(inRgdRecords, incomingRecords);
+        Collection<BioCycRecord> matching = CollectionUtils.intersection(incomingRecords, inRgdRecords);
+
+        if( !forInsert.isEmpty() ) {
+            log.info("lines to be inserted: " + forInsert.size());
+            for (BioCycRecord r : forInsert) {
+                dao.insertRecord(r);
+            }
+        }
+
+        if( !forDelete.isEmpty() ) {
+            log.info("lines to be deleted: " + forDelete.size());
+            for (BioCycRecord r : forDelete) {
+                dao.deleteRecord(r);
+            }
+        }
+
+        log.info("lines matching: " + matching.size());
     }
 
     Collection<BioCycRecord> merge(List<BioCycRecord> incoming) throws Exception {

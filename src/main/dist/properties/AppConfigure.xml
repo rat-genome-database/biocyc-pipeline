@@ -1,7 +1,7 @@
 <!DOCTYPE beans PUBLIC "-//SPRING//DTD BEAN//EN" "http://www.springframework.org/dtd/spring-beans.dtd">
 <beans>
     <bean id="main" class="edu.mcw.rgd.biocyc.Main">
-        <property name="version" value="BioCyc pipeline   -- build Apr 20, 2022" />
+        <property name="version" value="BioCyc pipeline   -- build May 10, 2022" />
         <property name="rgdSynchFile" value="https://biocyc.org/rgd-synch"/>
         <property name="bioCycGeneXdbKey" value="139"/>
         <property name="bioCycPathwayXdbKey" value="140"/>

@@ -2,6 +2,7 @@ package edu.mcw.rgd.biocyc;
 
 import edu.mcw.rgd.datamodel.Dumpable;
 import edu.mcw.rgd.process.Dumper;
+import edu.mcw.rgd.process.Utils;
 
 public class BioCycRecord implements Dumpable {
 
@@ -91,4 +92,15 @@ public class BioCycRecord implements Dumpable {
         .dump();
     }
 
+    @Override
+    public boolean equals(Object o) {
+        BioCycRecord r = (BioCycRecord) o;
+        return Utils.stringsAreEqual(geneRatCycId, r.geneRatCycId) &&
+                Utils.stringsAreEqual(pathwayRatCycId, r.pathwayRatCycId);
+    }
+
+    @Override
+    public int hashCode() {
+        return Utils.defaultString(geneRatCycId).hashCode() ^ Utils.defaultString(pathwayRatCycId).hashCode();
+    }
 }
