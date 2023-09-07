@@ -26,6 +26,7 @@ public class Main {
     private String rgdSynchFile;
     private int bioCycGeneXdbKey;
     private int bioCycPathwayXdbKey;
+    private int bioCycPathwayImageXdbKey;
 
     Logger log = LogManager.getLogger("status");
 
@@ -72,24 +73,25 @@ public class Main {
         String line;
         while( (line=in.readLine())!=null ) {
             String[] cols = line.split("[\\t]", -1);
-
+            
             // 1. The gene's RatCyc ID
             // 2. The gene's RGD ID (number, no prefix)
             // 3. The gene's NCBI ID (number, no prefix)
             // 4. The Uniprot ID of a product of the gene
             // 5. The RatCyc ID of a pathway associated with the gene
-            // 6. Name of pathway associated with the gene
-            // 7. A URL that points to the RatCyc pathway Page for the pathway in column 5
-            // 8. A URL that points to the RatCyc gene page for the gene in column 1
+            // 6. A URL that points to the RatCyc pathway Page for the pathway in column 5
+            // 7. A URL that points to the RatCyc gene page for the gene in column 1
+            // 8. (new) A URL that points to a gif image of the pathway diagram for the pathway in column 5
+
 
             BioCycRecord r = new BioCycRecord();
             r.setGeneRatCycId(cols[0]);
             r.setGeneNcbiId(cols[2]);
             r.setUniProtId(cols[3]);
             r.setPathwayRatCycId(cols[4]);
-            r.setPathwayRatCycName(cols[5]);
-            r.setPathwayRatCycPage(cols[6]);
-            r.setGeneRatCycPage(cols[7]);
+            r.setPathwayRatCycPage(cols[5]);
+            r.setGeneRatCycPage(cols[6]);
+            r.setPathwayRatCycImage(cols[7]);
 
             if( !Utils.isStringEmpty(cols[1]) ) {
                 r.setGeneRgdId(Integer.parseInt(cols[1]));
@@ -108,6 +110,7 @@ public class Main {
 
         generateGeneXdbIds(uniqueIncomingRecords);
         generatePathwayXdbIds(uniqueIncomingRecords);
+        generatePathwayImagesXdbIds(uniqueIncomingRecords);
 
         log.info("");
         log.info("===    time elapsed: "+ Utils.formatElapsedTime(startTime, System.currentTimeMillis()));
@@ -279,6 +282,54 @@ public class Main {
         dao.deleteXdbIds(xdbIdsForDelete);
     }
 
+    void generatePathwayImagesXdbIds(Collection<BioCycRecord> incoming) throws Exception {
+
+        log.info("pathways Image:");
+        List<XdbId> incomigPathwayImageXdbIds = new ArrayList<>();
+
+        incoming.parallelStream().forEach(r -> {
+
+            if( Utils.isStringEmpty(r.getPathwayRatCycImage()) ) {
+                return;
+            }
+
+            int geneRgdId = 0;
+            if( r.getGeneRgdId()!=null ) {
+                geneRgdId = r.getGeneRgdId();
+            }
+            else {
+                geneRgdId = dao.getGeneRgdIdByNcbiId(r.getGeneNcbiId(), SpeciesType.RAT);
+            }
+            if( geneRgdId==0  || r.getPathwayRatCycId().isEmpty()) {
+                //log.warn("no matching gene for RGD:"+r.getGeneRgdId()+", NCBI_ID:"+r.getGeneNcbiId());
+            } else {
+
+                XdbId xdbId = new XdbId();
+                xdbId.setXdbKey(getBioCycPathwayImageXdbKey());
+                xdbId.setAccId(r.getPathwayRatCycId());
+                xdbId.setLinkText(r.getPathwayRatCycId());
+                xdbId.setRgdId(geneRgdId);
+                xdbId.setSrcPipeline("BioCyc");
+                addToList(xdbId, incomigPathwayImageXdbIds);
+            }
+
+        });
+
+        List<XdbId> inRgdXdbIds = dao.getGeneBioCycXdbIds(getBioCycPathwayImageXdbKey());
+
+        List<XdbId> xdbIdsForInsert = new ArrayList<>(incomigPathwayImageXdbIds);
+        xdbIdsForInsert.removeAll(inRgdXdbIds);
+
+        List<XdbId> xdbIdsForDelete = new ArrayList<>(inRgdXdbIds);
+        xdbIdsForDelete.removeAll(incomigPathwayImageXdbIds);
+
+        log.info("   xdb ids for insert: "+xdbIdsForInsert.size());
+        log.info("   xdb ids for delete: "+xdbIdsForDelete.size());
+
+        dao.insertXdbIds(xdbIdsForInsert);
+        dao.deleteXdbIds(xdbIdsForDelete);
+    }
+
     synchronized void addToList(XdbId xdbId, List<XdbId> xdbIds) {
         xdbIds.add(xdbId);
     }
@@ -313,6 +364,14 @@ public class Main {
 
     public void setBioCycPathwayXdbKey(int bioCycPathwayXdbKey) {
         this.bioCycPathwayXdbKey = bioCycPathwayXdbKey;
+    }
+
+    public void setBioCycPathwayImageXdbKey(int bioCycPathwayImageXdbKey) {
+        this.bioCycPathwayImageXdbKey = bioCycPathwayImageXdbKey;
+    }
+
+    public int getBioCycPathwayImageXdbKey() {
+        return bioCycPathwayImageXdbKey;
     }
 }
 

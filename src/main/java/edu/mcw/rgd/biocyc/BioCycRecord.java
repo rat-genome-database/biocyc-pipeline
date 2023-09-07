@@ -14,6 +14,7 @@ public class BioCycRecord implements Dumpable {
     private String pathwayRatCycName;
     private String pathwayRatCycPage;
     private String geneRatCycPage;
+    private String pathwayRatCycImage;
 
     public String getGeneRatCycId() {
         return geneRatCycId;
@@ -89,6 +90,7 @@ public class BioCycRecord implements Dumpable {
                 .put("PATHWAY_RATCYC_ID", this.pathwayRatCycId)
                 .put("PATHWAY_RATCYC_NAME", this.pathwayRatCycName)
                 .put("PATHWAY_RATCYC_PAGE", this.pathwayRatCycPage)
+                .put("PATHWAY_RATCYC_IMAGE", this.pathwayRatCycImage)
         .dump();
     }
 
@@ -102,5 +104,13 @@ public class BioCycRecord implements Dumpable {
     @Override
     public int hashCode() {
         return Utils.defaultString(geneRatCycId).hashCode() ^ Utils.defaultString(pathwayRatCycId).hashCode();
+    }
+
+    public String getPathwayRatCycImage() {
+        return pathwayRatCycImage;
+    }
+
+    public void setPathwayRatCycImage(String pathwayRatCycImage) {
+        this.pathwayRatCycImage = pathwayRatCycImage;
     }
 }
