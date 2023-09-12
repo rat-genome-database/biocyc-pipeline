@@ -32,19 +32,19 @@ public class Dao {
     }
 
     public void insertRecord(BioCycRecord r) throws Exception {
-        pdao.insertRecord(r,logInserted);
+        pdao.insertBioCycRecord(r,logInserted);
     }
 
     public void deleteRecord(BioCycRecord r) throws Exception {
-        pdao.deleteRecord(r,logDeleted);
+        pdao.deleteBioCycRecord(r,logDeleted);
     }
 
     public List<BioCycRecord> getAllRecords() throws Exception {
-        return pdao.getAllRecords();
+        return pdao.getAllBioCycRecords();
     }
 
     public BioCycRecord getRecord(String geneRatCycId, String pathwayRatCycId) throws Exception {
-        return pdao.getRecord(geneRatCycId, pathwayRatCycId);
+        return pdao.getBioCycRecord(geneRatCycId, pathwayRatCycId);
     }
 
     public int getGeneRgdIdByNcbiId(String accId, int speciesTypeKey) {
