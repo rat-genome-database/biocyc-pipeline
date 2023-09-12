@@ -1,5 +1,6 @@
 package edu.mcw.rgd.biocyc;
 
+import edu.mcw.rgd.datamodel.BioCycRecord;
 import edu.mcw.rgd.datamodel.SpeciesType;
 import edu.mcw.rgd.datamodel.XdbId;
 import edu.mcw.rgd.process.FileDownloader;

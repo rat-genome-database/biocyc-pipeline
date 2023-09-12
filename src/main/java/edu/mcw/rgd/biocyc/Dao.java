@@ -1,10 +1,9 @@
 package edu.mcw.rgd.biocyc;
 
+import edu.mcw.rgd.dao.impl.PathwayDAO;
 import edu.mcw.rgd.dao.impl.XdbIdDAO;
-import edu.mcw.rgd.datamodel.Gene;
-import edu.mcw.rgd.datamodel.RgdId;
-import edu.mcw.rgd.datamodel.SpeciesType;
-import edu.mcw.rgd.datamodel.XdbId;
+import edu.mcw.rgd.dao.spring.BioCycQuery;
+import edu.mcw.rgd.datamodel.*;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.springframework.jdbc.core.SqlParameter;
@@ -21,6 +20,7 @@ import java.util.List;
 public class Dao {
 
     private XdbIdDAO xdao = new XdbIdDAO();
+    private PathwayDAO pdao = new PathwayDAO();
 
     Logger logInserted = LogManager.getLogger("inserted");
     Logger logDeleted = LogManager.getLogger("deleted");
@@ -32,65 +32,19 @@ public class Dao {
     }
 
     public void insertRecord(BioCycRecord r) throws Exception {
-
-        logInserted.debug("BIOCYC "+r.dump("|"));
-
-        String sql = "INSERT INTO biocyc (gene_ratcyc_id,gene_rgd_id,gene_ncbi_id,uniprot_id,gene_ratcyc_page,"
-                + "pathway_ratcyc_id,pathway_ratcyc_name,pathway_ratcyc_page) VALUES(?,?,?,?,?,?,?,?)";
-
-        xdao.update(sql, r.getGeneRatCycId(), r.getGeneRgdId(), r.getGeneNcbiId(), r.getUniProtId(), r.getGeneRatCycPage(),
-                r.getPathwayRatCycId(), r.getPathwayRatCycName(), r.getPathwayRatCycPage());
+        pdao.insertRecord(r,logInserted);
     }
 
     public void deleteRecord(BioCycRecord r) throws Exception {
-
-        logDeleted.debug("BIOCYC "+r.dump("|"));
-
-        if( r.getPathwayRatCycId()==null ) {
-            String sql = "DELETE FROM biocyc WHERE gene_ratcyc_id=? AND pathway_ratcyc_id IS NULL";
-            xdao.update(sql, r.getGeneRatCycId());
-        } else {
-            String sql = "DELETE FROM biocyc WHERE gene_ratcyc_id=? AND pathway_ratcyc_id=?";
-            xdao.update(sql, r.getGeneRatCycId(), r.getPathwayRatCycId());
-        }
+        pdao.deleteRecord(r,logDeleted);
     }
 
     public List<BioCycRecord> getAllRecords() throws Exception {
-
-        String sql = "SELECT * FROM biocyc";
-        BioCycQuery q = new BioCycQuery(xdao.getDataSource(), sql);
-        List<BioCycRecord> results = q.execute();
-        return results;
+        return pdao.getAllRecords();
     }
 
     public BioCycRecord getRecord(String geneRatCycId, String pathwayRatCycId) throws Exception {
-
-        if( pathwayRatCycId==null ) {
-            String sql = "SELECT * FROM biocyc WHERE gene_ratcyc_id=? AND pathway_ratcyc_id IS NULL";
-            BioCycQuery q = new BioCycQuery(xdao.getDataSource(), sql);
-            q.declareParameter(new SqlParameter(Types.VARCHAR));
-            List<BioCycRecord> results = q.execute(geneRatCycId);
-            if( results.isEmpty() ) {
-                return null;
-            }
-            if( results.size()>1 ) {
-                throw new Exception("unexpected: multiple results for "+geneRatCycId);
-            }
-            return results.get(0);
-        }
-
-        String sql = "SELECT * FROM biocyc WHERE gene_ratcyc_id=? AND pathway_ratcyc_id=?";
-        BioCycQuery q = new BioCycQuery(xdao.getDataSource(), sql);
-        q.declareParameter(new SqlParameter(Types.VARCHAR));
-        q.declareParameter(new SqlParameter(Types.VARCHAR));
-        List<BioCycRecord> results = q.execute(geneRatCycId, pathwayRatCycId);
-        if( results.isEmpty() ) {
-            return null;
-        }
-        if( results.size()>1 ) {
-            throw new Exception("unexpected: multiple results for "+geneRatCycId+", "+pathwayRatCycId);
-        }
-        return results.get(0);
+        return pdao.getRecord(geneRatCycId, pathwayRatCycId);
     }
 
     public int getGeneRgdIdByNcbiId(String accId, int speciesTypeKey) {
