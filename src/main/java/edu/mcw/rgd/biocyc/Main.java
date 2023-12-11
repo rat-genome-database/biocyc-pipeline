@@ -130,17 +130,17 @@ public class Main {
         Collection<BioCycRecord> forDelete = CollectionUtils.subtract(inRgdRecords, incomingRecords);
         Collection<BioCycRecord> matching = CollectionUtils.intersection(incomingRecords, inRgdRecords);
 
-        if( !forDelete.isEmpty() ) {
-            log.info("lines to be deleted: " + forDelete.size());
-            for (BioCycRecord r : forDelete) {
-                dao.deleteRecord(r);
-            }
-        }
-
         if( !forInsert.isEmpty() ) {
             log.info("lines to be inserted: " + forInsert.size());
             for (BioCycRecord r : forInsert) {
                 dao.insertRecord(r);
+            }
+        }
+
+        if( !forDelete.isEmpty() ) {
+            log.info("lines to be deleted: " + forDelete.size());
+            for (BioCycRecord r : forDelete) {
+                dao.deleteRecord(r);
             }
         }
 
