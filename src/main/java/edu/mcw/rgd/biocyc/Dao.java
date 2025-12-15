@@ -40,10 +40,6 @@ public class Dao {
         return pdao.getAllBioCycRecords();
     }
 
-    public BioCycRecord getRecord(String geneRatCycId, String pathwayRatCycId) throws Exception {
-        return pdao.getBioCycRecord(geneRatCycId, pathwayRatCycId);
-    }
-
     public int getGeneRgdIdByNcbiId(String accId, int speciesTypeKey) {
         List<Gene> genesInRgd;
         try {
