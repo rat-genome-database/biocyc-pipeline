@@ -4,6 +4,7 @@ import edu.mcw.rgd.datamodel.BioCycRecord;
 import edu.mcw.rgd.datamodel.SpeciesType;
 import edu.mcw.rgd.datamodel.XdbId;
 import edu.mcw.rgd.process.FileDownloader;
+import edu.mcw.rgd.process.MemoryMonitor;
 import edu.mcw.rgd.process.Utils;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.logging.log4j.LogManager;
@@ -48,6 +49,9 @@ public class Main {
     public void run() throws Exception {
 
         long startTime = System.currentTimeMillis();
+
+        MemoryMonitor memoryMonitor = new MemoryMonitor();
+        memoryMonitor.start();
 
         String msg = getVersion();
         log.info(msg);
@@ -117,6 +121,8 @@ public class Main {
         generatePathwayImagesXdbIds(uniqueIncomingRecords);
 
         log.info("");
+        memoryMonitor.stop();
+        log.info(memoryMonitor.getSummary());
         log.info("===    time elapsed: "+ Utils.formatElapsedTime(startTime, System.currentTimeMillis()));
         log.info("");
     }
