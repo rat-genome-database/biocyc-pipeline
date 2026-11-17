@@ -3,6 +3,7 @@ package edu.mcw.rgd.biocyc;
 import edu.mcw.rgd.datamodel.BioCycRecord;
 import edu.mcw.rgd.datamodel.SpeciesType;
 import edu.mcw.rgd.datamodel.XdbId;
+import edu.mcw.rgd.process.CounterPool;
 import edu.mcw.rgd.process.FileDownloader2;
 import edu.mcw.rgd.process.MemoryMonitor;
 import edu.mcw.rgd.process.Utils;
@@ -31,6 +32,9 @@ public class Main {
     private int bioCycPathwayImageXdbKey;
 
     Logger log = LogManager.getLogger("status");
+    Logger logInactive = LogManager.getLogger("inactive_genes");
+    Logger logNoMatch = LogManager.getLogger("nomatch");
+    Logger logMultiMatch = LogManager.getLogger("multimatch");
 
     public static void main(String[] args) throws Exception {
 
@@ -120,9 +124,11 @@ public class Main {
 
         updateBioCycTable(uniqueIncomingRecords);
 
-        generateGeneXdbIds(uniqueIncomingRecords);
-        generatePathwayXdbIds(uniqueIncomingRecords);
-        generatePathwayImagesXdbIds(uniqueIncomingRecords);
+        Map<BioCycRecord, Integer> activeGeneRgdIds = resolveActiveGenes(uniqueIncomingRecords);
+
+        generateGeneXdbIds(uniqueIncomingRecords, activeGeneRgdIds);
+        generatePathwayXdbIds(uniqueIncomingRecords, activeGeneRgdIds);
+        generatePathwayImagesXdbIds(uniqueIncomingRecords, activeGeneRgdIds);
 
         log.info("");
         memoryMonitor.stop();
@@ -201,7 +207,83 @@ public class Main {
         return uniqueMap.values();
     }
 
-    void generateGeneXdbIds(Collection<BioCycRecord> incoming) throws Exception {
+    /**
+     * match incoming records to active rat genes: first by the RGD id from the file, then by NCBI gene id;
+     * hits to inactive (withdrawn, retired) genes are not used, but are reported
+     * @return map of record to active gene rgd id; records without an active gene are not in the map
+     */
+    Map<BioCycRecord, Integer> resolveActiveGenes(Collection<BioCycRecord> incoming) throws Exception {
+
+        Map<Integer, String> geneStatuses = dao.getGeneStatuses(SpeciesType.RAT);
+
+        // the match depends only on (rgd id, ncbi id): resolve, count and report every combination once
+        Map<String, Integer> resolved = new HashMap<>();
+        CounterPool counters = new CounterPool();
+
+        Map<BioCycRecord, Integer> result = new HashMap<>();
+        for( BioCycRecord r: incoming ) {
+            String key = r.getGeneRgdId()+"|"+r.getGeneNcbiId();
+            Integer geneRgdId = resolved.get(key);
+            if( geneRgdId==null ) {
+                geneRgdId = resolveActiveGene(r, geneStatuses, counters);
+                resolved.put(key, geneRgdId);
+            }
+            if( geneRgdId!=0 ) {
+                result.put(r, geneRgdId);
+            }
+        }
+
+        log.info("genes matched by RGD id: "+counters.get("by RGD id")+",  by NCBI id: "+counters.get("by NCBI id")
+                +",  no match: "+counters.get("no match"));
+        int inactiveHits = counters.get("inactive hit");
+        if( inactiveHits!=0 ) {
+            log.info("   hits to inactive genes (skipped; see inactive_genes.log): "+inactiveHits);
+        }
+        return result;
+    }
+
+    /// @return rgd id of active gene, or 0 if there is no active gene for the record
+    int resolveActiveGene(BioCycRecord r, Map<Integer, String> geneStatuses, CounterPool counters) throws Exception {
+
+        if( r.getGeneRgdId()!=null ) {
+            int rgdId = r.getGeneRgdId();
+            String status = geneStatuses.get(rgdId);
+            if( "ACTIVE".equals(status) ) {
+                counters.increment("by RGD id");
+                return rgdId;
+            }
+            // file RGD id points to an inactive (or not a rat) gene: report it, then try NCBI gene id
+            counters.increment("inactive hit");
+            logInactive.debug("RGD:"+rgdId+" "+(status==null ? "NOT A RAT GENE" : status)
+                    +"  gene "+r.getGeneRatCycId()+"  NCBI:"+r.getGeneNcbiId()+"  (RGD id from file)");
+        }
+
+        if( !Utils.isStringEmpty(r.getGeneNcbiId()) ) {
+            List<Integer> activeRgdIds = new ArrayList<>();
+            for( int rgdId: dao.getGeneRgdIdsByNcbiId(r.getGeneNcbiId(), SpeciesType.RAT) ) {
+                String status = geneStatuses.get(rgdId);
+                if( "ACTIVE".equals(status) ) {
+                    activeRgdIds.add(rgdId);
+                } else if( !Objects.equals(rgdId, r.getGeneRgdId()) ) { // not already reported as RGD id from file
+                    counters.increment("inactive hit");
+                    logInactive.debug("RGD:"+rgdId+" "+status+"  gene "+r.getGeneRatCycId()+"  NCBI:"+r.getGeneNcbiId()+"  (matched by NCBI id)");
+                }
+            }
+            if( !activeRgdIds.isEmpty() ) {
+                if( activeRgdIds.size()>1 ) {
+                    logMultiMatch.debug("multiple active genes for NCBI gene id "+r.getGeneNcbiId()+": "+activeRgdIds);
+                }
+                counters.increment("by NCBI id");
+                return activeRgdIds.get(0);
+            }
+        }
+
+        counters.increment("no match");
+        logNoMatch.debug("no active gene for RGD:"+r.getGeneRgdId()+"  NCBI:"+r.getGeneNcbiId()+"  gene "+r.getGeneRatCycId());
+        return 0;
+    }
+
+    void generateGeneXdbIds(Collection<BioCycRecord> incoming, Map<BioCycRecord, Integer> activeGeneRgdIds) throws Exception {
 
         log.info("genes:");
 
@@ -209,16 +291,8 @@ public class Main {
 
         incoming.parallelStream().forEach( r -> {
 
-            int geneRgdId = 0;
-            if( r.getGeneRgdId()!=null ) {
-                geneRgdId = r.getGeneRgdId();
-            }
-            else {
-                geneRgdId = dao.getGeneRgdIdByNcbiId(r.getGeneNcbiId(), SpeciesType.RAT);
-            }
-            if( geneRgdId==0 ) {
-                //log.warn("no matching gene for RGD:"+r.getGeneRgdId()+", NCBI_ID:"+r.getGeneNcbiId());
-            } else {
+            Integer geneRgdId = activeGeneRgdIds.get(r);
+            if( geneRgdId!=null ) {
 
                 XdbId xdbId = new XdbId();
                 xdbId.setXdbKey(getBioCycGeneXdbKey());
@@ -246,7 +320,7 @@ public class Main {
         dao.deleteXdbIds(xdbIdsForDelete);
     }
 
-    void generatePathwayXdbIds(Collection<BioCycRecord> incoming) throws Exception {
+    void generatePathwayXdbIds(Collection<BioCycRecord> incoming, Map<BioCycRecord, Integer> activeGeneRgdIds) throws Exception {
 
         log.info("pathways:");
 
@@ -258,16 +332,8 @@ public class Main {
                 return;
             }
 
-            int geneRgdId = 0;
-            if( r.getGeneRgdId()!=null ) {
-                geneRgdId = r.getGeneRgdId();
-            }
-            else {
-                geneRgdId = dao.getGeneRgdIdByNcbiId(r.getGeneNcbiId(), SpeciesType.RAT);
-            }
-            if( geneRgdId==0 ) {
-                //log.warn("no matching gene for RGD:"+r.getGeneRgdId()+", NCBI_ID:"+r.getGeneNcbiId());
-            } else {
+            Integer geneRgdId = activeGeneRgdIds.get(r);
+            if( geneRgdId!=null ) {
 
                 XdbId xdbId = new XdbId();
                 xdbId.setXdbKey(getBioCycPathwayXdbKey());
@@ -296,27 +362,19 @@ public class Main {
         dao.deleteXdbIds(xdbIdsForDelete);
     }
 
-    void generatePathwayImagesXdbIds(Collection<BioCycRecord> incoming) throws Exception {
+    void generatePathwayImagesXdbIds(Collection<BioCycRecord> incoming, Map<BioCycRecord, Integer> activeGeneRgdIds) throws Exception {
 
         log.info("pathways Image:");
         List<XdbId> incomigPathwayImageXdbIds = new ArrayList<>();
 
         incoming.parallelStream().forEach(r -> {
 
-            if( Utils.isStringEmpty(r.getPathwayRatCycImage()) ) {
+            if( Utils.isStringEmpty(r.getPathwayRatCycImage()) || r.getPathwayRatCycId().isEmpty() ) {
                 return;
             }
 
-            int geneRgdId = 0;
-            if( r.getGeneRgdId()!=null ) {
-                geneRgdId = r.getGeneRgdId();
-            }
-            else {
-                geneRgdId = dao.getGeneRgdIdByNcbiId(r.getGeneNcbiId(), SpeciesType.RAT);
-            }
-            if( geneRgdId==0  || r.getPathwayRatCycId().isEmpty()) {
-                //log.warn("no matching gene for RGD:"+r.getGeneRgdId()+", NCBI_ID:"+r.getGeneNcbiId());
-            } else {
+            Integer geneRgdId = activeGeneRgdIds.get(r);
+            if( geneRgdId!=null ) {
 
                 XdbId xdbId = new XdbId();
                 xdbId.setXdbKey(getBioCycPathwayImageXdbKey());
